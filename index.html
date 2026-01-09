@@ -81,23 +81,32 @@
       .node-pill {
         background-color: #34495e;
         color: white;
-        padding: 10px 12px;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         border-radius: 8px;
         font-size: 12px;
         font-weight: 600;
         box-shadow: 0 4px 10px rgba(44, 62, 80, 0.3);
         cursor: pointer;
         border: 1px solid #2c3e50;
-
+        height: 50px; /* 固定高度 */
         width: 146px;
+        overflow: hidden;
+      }
 
-        /* 多行省略核心 */
+      .pill-text {
         display: -webkit-box;
         -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-
+        -webkit-line-clamp: 2; /* 限制2行 */
         overflow: hidden;
-        word-break: break-word;
+        text-overflow: ellipsis;
+        text-align: center;
+        width: 100%;
+        line-height: 1.4;
+        max-height: 36px; /* 2行的高度 */
+        word-break: break-word; /* 允许单词换行 */
       }
 
       .is-root .node-pill {
@@ -153,8 +162,8 @@
       .toggle-btn {
         position: absolute;
         right: -12px;
-        top: 50%;
-        transform: translateY(-50%);
+        top: 15px;
+        /*transform: translateY(-50%);*/
         width: 20px;
         height: 20px;
         background: #95a5a6;
@@ -296,6 +305,30 @@
         max-width: 200px;
         word-break: break-all;
       }
+      /* 在原有样式基础上添加 */
+      .node-container {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .node-desc {
+        background-color: rgba(255, 255, 255, 0.9);
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 6px 10px;
+        margin-top: 6px;
+        font-size: 11px;
+        line-height: 1.5;
+        color: #666;
+        max-width: 146px;
+        max-height: 60px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
     </style>
   </head>
   <body>
@@ -349,12 +382,12 @@
 
       // --- 2. 配置参数 ---
       const CONFIG = {
-        nodeXGap: 60,
+        nodeXGap: 50,
         nodeYGap: 20,
         cardWidth: 260,
         pillWidth: 160,
-        cardHeight: 90,
-        pillHeight: 40,
+        cardHeight: 50,
+        pillHeight: 50,
       };
 
       // --- 3. 核心变量 ---
@@ -1501,7 +1534,11 @@
         node.h = isLeaf ? CONFIG.cardHeight : CONFIG.pillHeight;
 
         if (!node.children || node.children.length === 0 || node.collapsed) {
-          node.treeHeight = node.h + CONFIG.nodeYGap;
+          let newNodeYGap = CONFIG.nodeYGap;
+          if (node.type === 'branch') {
+            newNodeYGap = node.desc ? 100 : 20;
+          }
+          node.treeHeight = node.h + newNodeYGap;
           return;
         }
 
@@ -1510,7 +1547,7 @@
           layoutTree(child);
           childrenTotalHeight += child.treeHeight;
         });
-        node.treeHeight = childrenTotalHeight;
+        node.treeHeight = node.desc ? childrenTotalHeight + 50 : childrenTotalHeight;
       }
 
       function assignCoordinates(node, x, y) {
@@ -1555,6 +1592,40 @@
         layoutTree(mindMapData);
         assignCoordinates(mindMapData, 50, 400);
 
+        // flatNodes.forEach(node => {
+        //   const el = document.createElement('div');
+        //   el.className = `node ${node.type === 'root' ? 'is-root' : ''}`;
+        //   el.style.left = `${node.x}px`;
+        //   el.style.top = `${node.y - node.h / 2}px`;
+        //
+        //   let contentHTML = '';
+        //   if (node.type === 'leaf') {
+        //     contentHTML = `
+        //   <div class="node-card">
+        //     <div class="card-desc">${cleanNodeText(node.title)}</div>
+        //   </div>
+        // `;
+        //   } else {
+        //     contentHTML = `
+        //    <div class="node-pill" onclick="toggleNode('${node.id}', event)">
+        //     ${cleanNodeText(node.text)}
+        //   </div>
+        // `;
+        //   }
+        //
+        //   if (node.children && node.children.length > 0) {
+        //     contentHTML += `
+        //   <div class="toggle-btn ${node.collapsed ? 'collapsed' : ''}"
+        //        onclick="toggleNode('${node.id}', event)">
+        //        ${node.collapsed ? '+' : '-'}
+        //   </div>
+        // `;
+        //   }
+        //
+        //   el.innerHTML = contentHTML;
+        //   domLayer.appendChild(el);
+        // });
+
         flatNodes.forEach(node => {
           const el = document.createElement('div');
           el.className = `node ${node.type === 'root' ? 'is-root' : ''}`;
@@ -1564,25 +1635,44 @@
           let contentHTML = '';
           if (node.type === 'leaf') {
             contentHTML = `
-          <div class="node-card">
-            <div class="card-desc">${cleanNodeText(node.title)}</div>
-          </div>
-        `;
+        <div class="node-card">
+          <div class="card-desc">${cleanNodeText(node.title)}</div>
+        </div>
+      `;
           } else {
-            contentHTML = `
-          <div class="node-pill" onclick="toggleNode('${node.id}', event)">
-            ${cleanNodeText(node.text)}
+            // 这里是关键修改：在node-pill下面添加描述文档
+            const cleanDesc = cleanNodeText(node.desc || '');
+            const hasDesc = cleanDesc.trim() !== '';
+
+            contentHTML = `<div class="node-container">`;
+
+            // 原有的胶囊节点
+            contentHTML += `
+        <div class="node-pill" onclick="toggleNode('${node.id}', event)">
+        <div class="pill-text">${cleanNodeText(node.text)}</div>
+    </div>
+      `;
+
+            // 新增的描述文档（如果有描述）
+            if (hasDesc && node.desc) {
+              contentHTML += `
+          <div class="node-desc" onclick="toggleNode('${node.id}', event)">
+            ${cleanDesc}
           </div>
         `;
+            }
+
+            contentHTML += `</div>`;
           }
 
+          // 添加折叠/展开按钮
           if (node.children && node.children.length > 0) {
             contentHTML += `
-          <div class="toggle-btn ${node.collapsed ? 'collapsed' : ''}"
-               onclick="toggleNode('${node.id}', event)">
-               ${node.collapsed ? '+' : '-'}
-          </div>
-        `;
+        <div class="toggle-btn ${node.collapsed ? 'collapsed' : ''}"
+             onclick="toggleNode('${node.id}', event)">
+             ${node.collapsed ? '+' : '-'}
+        </div>
+      `;
           }
 
           el.innerHTML = contentHTML;
